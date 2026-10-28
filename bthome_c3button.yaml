@@ -1,0 +1,191 @@
+# Board: ESP32-C3 Super Mini (Generic)
+substitutions:
+  adv_window: 1200ms
+
+esphome:
+  name: c3-button-remote
+  friendly_name: C3 Button Remote
+  on_boot:
+    - priority: 900
+      then:
+        - switch.turn_on: led_gpio
+        - lambda: |-
+            // Kill internal USB PHY to prevent 700uA baseline leakage if it wakes
+            *((volatile uint32_t *) 0x60043000) &= ~1;
+
+            // 1. Hardware wake status
+            uint64_t status = esp_sleep_get_gpio_wakeup_status();
+
+            // 2. Pull-ups on, let pin capacitance settle
+            for (int p = 0; p <= 5; p++) {
+              gpio_num_t pin = (gpio_num_t) p;
+              gpio_set_direction(pin, GPIO_MODE_INPUT);
+              gpio_pullup_en(pin);
+              gpio_pulldown_dis(pin);
+            }
+            delayMicroseconds(50);
+
+            // 3. Latch anything currently held LOW
+            for (int p = 0; p <= 5; p++) {
+              if (gpio_get_level((gpio_num_t) p) == 0) status |= (1ULL << p);
+            }
+            id(wake_mask) = (int) (status & 0x3F);
+
+            // Maintenance mode: wake by holding button 0 + button 5 together
+            if ((id(wake_mask) & 0x21) == 0x21) {
+              id(maint_mode) = true;
+            } else if (id(wake_mask) != 0) {
+              bthome_btn::send_buttons((uint8_t) id(wake_mask));
+            }
+
+    - priority: -100
+      then:
+        - if:
+            condition:
+              lambda: 'return id(maint_mode);'
+            then:
+              - logger.log: "Maintenance mode: WiFi + OTA on, deep sleep disabled"
+              - deep_sleep.prevent: sleep_control
+              - wifi.enable:
+            else:
+              - script.execute: sleep_after_adv
+
+external_components:
+  - source:
+      type: local
+      path: components
+    components: [bthome_button]
+
+bthome_button:
+  
+esp32:
+  variant: esp32c3
+  flash_size: 4MB
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_BOOTLOADER_SKIP_VALIDATE_IN_DEEP_SLEEP: y
+      CONFIG_BOOTLOADER_LOG_LEVEL_NONE: y
+      CONFIG_ESP_CONSOLE_UART_DEFAULT: "y"
+      CONFIG_ESP32C3_RTC_CLK_SRC_INT_RC: y  # CRITICAL: Frees GPIO 0/1 from analog XTAL mode
+
+logger:
+  level: INFO # Change to NONE for final battery deployment
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  enable_on_boot: false
+  fast_connect: true
+  output_power: 8.5dB
+
+globals:
+  - id: wake_mask
+    type: int
+    restore_value: no
+    initial_value: '0'
+  - id: maint_mode
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+
+deep_sleep:
+  id: sleep_control
+  run_duration: 10s
+
+binary_sensor:
+  - platform: gpio
+    id: btn_0
+    pin: { number: GPIO0, mode: { input: true, pullup: true }, inverted: true }
+    filters: [delayed_on: 10ms]
+    on_press:
+      - lambda: 'bthome_btn::send_buttons(1 << 0);'
+      - script.execute: sleep_after_adv
+  - platform: gpio
+    id: btn_1
+    pin: { number: GPIO1, mode: { input: true, pullup: true }, inverted: true }
+    filters: [delayed_on: 10ms]
+    on_press:
+      - lambda: 'bthome_btn::send_buttons(1 << 1);'
+      - script.execute: sleep_after_adv
+  - platform: gpio
+    id: btn_2
+    pin: { number: GPIO2, mode: { input: true, pullup: true }, inverted: true }
+    filters: [delayed_on: 10ms]
+    on_press:
+      - lambda: 'bthome_btn::send_buttons(1 << 2);'
+      - script.execute: sleep_after_adv
+  - platform: gpio
+    id: btn_3
+    pin: { number: GPIO3, mode: { input: true, pullup: true }, inverted: true }
+    filters: [delayed_on: 10ms]
+    on_press:
+      - lambda: 'bthome_btn::send_buttons(1 << 3);'
+      - script.execute: sleep_after_adv
+  - platform: gpio
+    id: btn_4
+    pin: { number: GPIO4, mode: { input: true, pullup: true }, inverted: true }
+    filters: [delayed_on: 10ms]
+    on_press:
+      - lambda: 'bthome_btn::send_buttons(1 << 4);'
+      - script.execute: sleep_after_adv
+  - platform: gpio
+    id: btn_5
+    pin: { number: GPIO5, mode: { input: true, pullup: true }, inverted: true }
+    filters: [delayed_on: 10ms]
+    on_press:
+      - lambda: 'bthome_btn::send_buttons(1 << 5);'
+      - script.execute: sleep_after_adv
+
+switch:
+  - platform: gpio
+    id: led_gpio
+    pin: GPIO8
+    inverted: true
+    internal: true
+    restore_mode: ALWAYS_ON
+
+script:
+  - id: sleep_after_adv
+    mode: restart
+    then:
+      - if:
+          condition:
+            lambda: 'return !id(maint_mode);'
+          then:
+            - delay: ${adv_window}
+            - wait_until:
+                condition:
+                  lambda: |-
+                    return !id(btn_0).state && !id(btn_1).state && !id(btn_2).state &&
+                           !id(btn_3).state && !id(btn_4).state && !id(btn_5).state;
+                timeout: 5s
+            - lambda: |-
+                bthome_btn::end();
+                
+                // Configure wake pins (0-5)
+                for (int p = 0; p <= 5; p++) {
+                  gpio_num_t pin = (gpio_num_t) p;
+                  gpio_pullup_en(pin);
+                  gpio_pulldown_dis(pin);
+                  gpio_sleep_set_direction(pin, GPIO_MODE_INPUT);
+                  gpio_sleep_set_pull_mode(pin, GPIO_PULLUP_ONLY);
+                }
+                
+                // Isolate all unused pins 
+                const int unused_pins[] = {6, 7, 9, 10, 18, 19, 20, 21};
+                for (int i = 0; i < 8; i++) {
+                  gpio_num_t pin = (gpio_num_t) unused_pins[i];
+                  gpio_reset_pin(pin);
+                  gpio_sleep_set_direction(pin, GPIO_MODE_DISABLE);
+                  gpio_sleep_set_pull_mode(pin, GPIO_FLOATING);
+                }
+
+                gpio_deep_sleep_hold_en();
+                esp_deep_sleep_enable_gpio_wakeup(0x3F, ESP_GPIO_WAKEUP_GPIO_LOW);
+            - switch.turn_off: led_gpio
+            - deep_sleep.enter: sleep_control
