@@ -54,9 +54,9 @@ external_components:
   - source:
       type: local
       path: components
-    components: [bthome_button]
+    components: [bthome_c3button]
 
-bthome_button:
+bthome_c3button:
   
 esp32:
   variant: esp32c3
