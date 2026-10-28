@@ -33,6 +33,16 @@ The primary firmware configuration is defined in the `bthome_c3button.yaml` file
 
 By default, WiFi is disabled. To flash updates over the air, enter Maintenance Mode by waking the board using both button 1 (GPIO 0) and button 6 (GPIO 5) at the same time.  That will enable WiFi and keep the board awake.  The board will stay awake until getting reset, so if you do not install OTA firmware (which will reset the board), you will need to manually reset the board.
 
+## Setup in Home Assistant
+
+You need Bluetooth, which is usually done in Home Assistant with a Bluetooth proxy.  This assumes you have already set that up.
+
+You need BTHome (In `Devices and services` in Home Assistant).  This assumes you have already installed that.
+
+After flashing the Super Mini board with the firmware, press one of the buttons.  The board should automatically be detected by BTHome, which will forward it to Home Assistant.
+
+It will show up in Home Assistant as `C3 Btn WXYZ` (`WXYZ` will change based on your board).  The events that it emits will be named `Button 1` through `Button 6`.
+
 # AI Disclaimer
 
 Much of the code was written by an LLM.  A human did physical testing to guide debugging and iteration.  A human reviewed the code at the end and added finishing touches.
