@@ -35,7 +35,7 @@ esphome:
             if ((id(wake_mask) & 0x21) == 0x21) {
               id(maint_mode) = true;
             } else if (id(wake_mask) != 0) {
-              bthome_btn::send_buttons((uint8_t) id(wake_mask));
+              bthome_c3btn::send_buttons((uint8_t) id(wake_mask));
             }
 
     - priority: -100
@@ -103,42 +103,42 @@ binary_sensor:
     pin: { number: GPIO0, mode: { input: true, pullup: true }, inverted: true }
     filters: [delayed_on: 10ms]
     on_press:
-      - lambda: 'bthome_btn::send_buttons(1 << 0);'
+      - lambda: 'bthome_c3btn::send_buttons(1 << 0);'
       - script.execute: sleep_after_adv
   - platform: gpio
     id: btn_1
     pin: { number: GPIO1, mode: { input: true, pullup: true }, inverted: true }
     filters: [delayed_on: 10ms]
     on_press:
-      - lambda: 'bthome_btn::send_buttons(1 << 1);'
+      - lambda: 'bthome_c3btn::send_buttons(1 << 1);'
       - script.execute: sleep_after_adv
   - platform: gpio
     id: btn_2
     pin: { number: GPIO2, mode: { input: true, pullup: true }, inverted: true }
     filters: [delayed_on: 10ms]
     on_press:
-      - lambda: 'bthome_btn::send_buttons(1 << 2);'
+      - lambda: 'bthome_c3btn::send_buttons(1 << 2);'
       - script.execute: sleep_after_adv
   - platform: gpio
     id: btn_3
     pin: { number: GPIO3, mode: { input: true, pullup: true }, inverted: true }
     filters: [delayed_on: 10ms]
     on_press:
-      - lambda: 'bthome_btn::send_buttons(1 << 3);'
+      - lambda: 'bthome_c3btn::send_buttons(1 << 3);'
       - script.execute: sleep_after_adv
   - platform: gpio
     id: btn_4
     pin: { number: GPIO4, mode: { input: true, pullup: true }, inverted: true }
     filters: [delayed_on: 10ms]
     on_press:
-      - lambda: 'bthome_btn::send_buttons(1 << 4);'
+      - lambda: 'bthome_c3btn::send_buttons(1 << 4);'
       - script.execute: sleep_after_adv
   - platform: gpio
     id: btn_5
     pin: { number: GPIO5, mode: { input: true, pullup: true }, inverted: true }
     filters: [delayed_on: 10ms]
     on_press:
-      - lambda: 'bthome_btn::send_buttons(1 << 5);'
+      - lambda: 'bthome_c3btn::send_buttons(1 << 5);'
       - script.execute: sleep_after_adv
 
 switch:
